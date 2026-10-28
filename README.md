@@ -21,4 +21,4 @@ Creating one quote took 7+ steps and up to six people: a slow, over-customized C
 Roughly 3x faster time-to-market for new offers, adopted by 30+ users across four to five teams.
 
 ---
-Nouha Meddeb · [LinkedIn](https://linkedin.com/in/nouhameddeb)
+Nouha Meddeb · [LinkedIn](https://www.linkedin.com/in/nouha-meddeb/)
