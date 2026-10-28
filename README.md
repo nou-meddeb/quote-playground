@@ -5,6 +5,13 @@ A clickable prototype of a quote and pricing editor, reconstructed from an in-ho
 **Live prototype:** https://nou-meddeb.github.io/quote-playground/
 **45-second walkthrough:** [demo.mp4](demo.mp4)
 
+## Portfolio samples
+| Sample | What it shows |
+| --- | --- |
+| [Requirements spec](docs/spec.md) | Problem, affected users, proposed behavior, Given/When/Then acceptance criteria |
+| [Prioritized backlog](docs/backlog.md) | Seven real requests ranked by retention risk, revenue impact and reach, including two I said no to and the alternatives I offered |
+| [Clickable prototype](https://nou-meddeb.github.io/quote-playground/) | The quote editor at the heart of the spec |
+
 ## The problem it solved
 Creating one quote took 7+ steps and up to six people: a slow, over-customized CRM, a separate product platform, sequential approvals, legal reviews through separate tickets, and manual quote fixes that broke invoicing later.
 
