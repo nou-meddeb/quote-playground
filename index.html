@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Quote Playground</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-pane tool. Left = editable quote, right = live customer PDF preview + approval + history */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --ink:#1d2421; --muted:#5f6a65; --line:#d9ddd9;
+  --accent:#1f6f5c; --accent-soft:#e1efe9; --warn:#a15c07; --warn-soft:#fbefdc;
+  --bad:#b4342b; --bad-soft:#f8e3e0; --ok:#1f6f5c;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141917; --surface:#1c2320; --ink:#e7ece9; --muted:#9aa6a0; --line:#2f3934;
+  --accent:#5cc2a5; --accent-soft:#1d3a32; --warn:#e4a34b; --warn-soft:#3a2c17;
+  --bad:#ef8077; --bad-soft:#3f2220; --ok:#5cc2a5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --surface:#1c2320; --ink:#e7ece9; --muted:#9aa6a0; --line:#2f3934;
+  --accent:#5cc2a5; --accent-soft:#1d3a32; --warn:#e4a34b; --warn-soft:#3a2c17;
+  --bad:#ef8077; --bad-soft:#3f2220; --ok:#5cc2a5; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+.grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px}
+.meta b{font-weight:500}
+.link{color:var(--accent)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:500;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.dragging{opacity:.4}
+tr.over td{box-shadow:inset 0 2px 0 var(--accent)}
+.handle{cursor:grab;color:var(--muted);user-select:none;font-family:var(--mono);padding:0 4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:5px 7px}
+input[type=number]{width:78px;text-align:right;font-family:var(--mono)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input.total{width:104px}
+.itemnote{width:100%;min-width:180px;margin-top:4px;font-size:12.5px}
+.pdf .itemtext{color:var(--muted);white-space:pre-wrap;font-size:11.5px;margin-top:1px}
+input.total.manual{border-style:dashed;border-color:var(--accent)}
+td input.invalid{border-color:var(--bad);background:var(--bad-soft)}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:500}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+button.icon{padding:3px 8px;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.totals{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-family:var(--mono);font-variant-numeric:tabular-nums;justify-self:end;min-width:260px;margin-left:auto}
+.totals .label{font-family:var(--sans);color:var(--muted)}
+.totals .grand{font-weight:600;font-size:16px;border-top:1px solid var(--line);padding-top:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500}
+.pill.ok{background:var(--accent-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.msg{font-size:13px;border-radius:6px;padding:8px 10px}
+.msg.bad{background:var(--bad-soft);color:var(--bad)}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+textarea{width:100%;min-height:64px;resize:vertical}
+.pdf{background:var(--bg);border:1px dashed var(--line);border-radius:6px;padding:14px;font-size:12.5px;display:flex;flex-direction:column;gap:8px}
+.pdf .hdr{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pdf table{min-width:0;font-size:12px}
+.pdf td,.pdf th{padding:3px 4px}
+.pdf .note{white-space:pre-wrap;border-left:2px solid var(--line);padding-left:8px;color:var(--ink)}
+ol.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px;max-height:220px;overflow:auto}
+ol.log li{display:grid;grid-template-columns:auto 1fr;gap:8px}
+ol.log time{font-family:var(--mono);color:var(--muted);font-size:11px;padding-top:1px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px}
+.hint{font-size:12px;color:var(--muted)}
+.try{background:var(--accent-soft);border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.try h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0;font-weight:600}
+.try ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;max-width:75ch}
+@media (prefers-reduced-motion:no-preference){.pill,.msg{transition:background .2s,color .2s}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Quote Q-2041 · Extension of deal D-1187</h1>
+      <p class="sub">Sales manager and approver edit together. Prices preview before anything is saved.</p>
+    </div>
+    <span class="tag">Prototype · sample data</span>
+  </header>
+
+  <section class="try" aria-labelledby="h-try">
+    <h2 id="h-try">Try this (2 minutes)</h2>
+    <ol>
+      <li>Set the licence discount to <b>20</b>. The quote now needs approval.</li>
+      <li>Click <b>Invite approver</b>. The sales director joins and approves in the same session.</li>
+      <li>Type a <b>line total</b> by hand, or a <b>negative discount</b>. Check the PDF: neither is shown to the customer.</li>
+      <li>Add text under an item, then <b>Save</b> and <b>Download PDF</b>. Edit anything and the download disappears until you save again.</li>
+    </ol>
+  </section>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-lines">
+      <h2 id="h-lines">Line items</h2>
+      <div class="meta">
+        <span>Customer: <b>Example Customer GmbH</b></span>
+        <span>Based on: <span class="link">D-1187 (signed 2025)</span></span>
+        <span>Price list: <b>v2026.2</b></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th aria-label="Reorder"></th><th>Item</th><th class="num">Qty</th><th class="num">Unit price €</th><th class="num">Discount %</th><th class="num">Line total €</th><th></th></tr></thead>
+          <tbody id="lines"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <label for="addSel" class="hint">Add item</label>
+        <select id="addSel"></select>
+        <button id="addBtn">Add</button>
+        <span class="hint">Drag ⋮⋮ to reorder. Type a discount (negative = surcharge) or set the line total directly.</span>
+      </div>
+      <div id="errors"></div>
+      <div class="totals" aria-live="polite">
+        <span class="label">Subtotal</span><span id="tSub"></span>
+        <span class="label">Discounts / surcharges</span><span id="tDisc"></span>
+        <span class="label grand">Total (net)</span><span class="grand" id="tTot"></span>
+      </div>
+
+      <h2>Text on customer PDF</h2>
+      <textarea id="pdfText" placeholder="e.g. Prices valid for 60 days. Support hours CET 8:00 to 18:00."></textarea>
+      <label class="row hint"><input type="checkbox" id="customTerms"> Includes non-standard terms (sends to legal)</label>
+
+      <div class="row">
+        <button class="primary" id="saveBtn">Save quote</button>
+        <button id="pdfBtn" hidden>Download PDF</button>
+        <button id="resetBtn">Reset example</button>
+      </div>
+    </section>
+
+    <aside class="panel" aria-labelledby="h-status">
+      <h2 id="h-status">Approval</h2>
+      <div id="status"></div>
+      <div class="row">
+        <button id="inviteBtn">Invite approver to this quote</button>
+        <span id="presence" class="hint" aria-live="polite"></span>
+      </div>
+      <button id="approveBtn" hidden>Approve discount</button>
+
+      <h2>Customer PDF preview</h2>
+      <div class="pdf" id="pdf"></div>
+
+      <h2>Change history</h2>
+      <ol class="log" id="log"></ol>
+    </aside>
+  </div>
+  <p class="hint">Portfolio prototype by Nouha Meddeb, reconstructed from a pricing platform I designed. Products, prices and rules are illustrative. Rules shown: discounts up to 15% approve automatically; 15 to 30% need the approver; above 30% are blocked; negative discounts (surcharges) are allowed; a one-time fee needs a licence on the quote. The customer PDF shows a discount only when it is positive and entered as a percentage; surcharges and hand-edited totals show as the net amount only.</p>
+</div>
+
+<script>
+const CATALOG=[
+  {id:"lic",name:"Platform licence (annual)",price:24000,type:"licence"},
+  {id:"int",name:"Integration package",price:9500,type:"service"},
+  {id:"sup",name:"Premium support (annual)",price:6000,type:"support"},
+  {id:"setup",name:"One-time setup fee",price:3500,type:"onetime"},
+  {id:"dev",name:"Custom development (days)",price:1100,type:"service"}
+];
+const AUTO=15, MAX=30;
+let lines, approved, log, dragIdx=null, invited=false, joined=false, savedSnap=null;
+const $=s=>document.querySelector(s);
+const fmt=n=>Math.round(n).toLocaleString("de-DE");
+const r2=v=>Math.round(v*100)/100;
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const now=()=>new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+const item=id=>CATALOG.find(c=>c.id===id);
+const gross=l=>item(l.id).price*l.qty;
+const net=l=>gross(l)*(1-(l.disc||0)/100);
+const snap=()=>JSON.stringify([lines,$("#pdfText").value,$("#customTerms").checked,approved]);
+
+function init(){
+  lines=[{id:"lic",qty:1,disc:10,manual:false,note:"Includes up to 50 user seats and the analytics module."},{id:"sup",qty:1,disc:0,manual:false,note:""},{id:"dev",qty:8,disc:5,manual:false,note:"Custom export to the customer's ERP, scoped in workshop on 12 Nov."}];
+  approved=false; invited=false; joined=false; savedSnap=null;
+  log=[{t:"09:12",who:"System",what:"Quote created from D-1187 (lines copied, link kept)"}];
+  $("#pdfText").value="Prices valid for 60 days.";
+  $("#customTerms").checked=false;
+  render();
+}
+/* Apply a typed value to a line. Editing the total sets an implied discount (can be negative). */
+function apply(l,kind,raw){
+  const v=parseFloat(raw);
+  if(kind==="q"){ l.qty=Math.max(0,Number.isFinite(v)?v:0); }
+  else if(kind==="d"){ l.disc=Number.isFinite(v)?v:0; l.manual=false; }
+  else if(kind==="n"){ l.note=raw; }
+  else { const g=gross(l); const t=Number.isFinite(v)?v:g; l.disc=g?(1-t/g)*100:0; l.manual=true; }
+}
+function maxDisc(ls){return Math.max(0,...ls.map(l=>l.disc||0))}
+function errors(ls){
+  const e=[];
+  ls.forEach(l=>{const n=item(l.id).name;
+    if(l.disc>MAX) e.push(`${n}: discount ${r2(l.disc)}% is above the ${MAX}% limit.`);
+    if(!(l.qty>0)) e.push(`${n}: quantity must be at least 1.`);
+    if(net(l)<0) e.push(`${n}: line total cannot be below zero.`);});
+  if(ls.some(l=>item(l.id).type==="onetime") && !ls.some(l=>item(l.id).type==="licence"))
+    e.push("A one-time setup fee needs a platform licence on the same quote.");
+  if(!ls.length) e.push("Add at least one item.");
+  return e;
+}
+function state(ls){
+  const errs=errors(ls), md=r2(maxDisc(ls));
+  if(errs.length) return {k:"bad",txt:"Cannot be saved",errs};
+  if(md>AUTO && !approved) return {k:"warn",txt:`Needs approval: highest discount ${md}% is above ${AUTO}%`,errs};
+  if(md>AUTO && approved) return {k:"ok",txt:"Discount approved in session",errs};
+  return {k:"ok",txt:`Auto-approved: all discounts within ${AUTO}%`,errs};
+}
+function totals(ls){
+  const sub=ls.reduce((a,l)=>a+gross(l),0), tot=ls.reduce((a,l)=>a+net(l),0), adj=tot-sub;
+  $("#tSub").textContent=fmt(sub);
+  $("#tDisc").textContent=(adj<=0?"−":"+")+fmt(Math.abs(adj));
+  $("#tTot").textContent="€ "+fmt(tot);
+  const s=state(ls);
+  $("#status").innerHTML=`<span class="pill ${s.k}">${s.txt}</span>`;
+  renderPdf(ls,tot);
+  return s;
+}
+function render(){
+  const tb=$("#lines"); tb.innerHTML="";
+  lines.forEach((l,i)=>{
+    const c=item(l.id);
+    const tr=document.createElement("tr"); tr.draggable=true; tr.dataset.i=i;
+    tr.innerHTML=`<td><span class="handle" aria-hidden="true">⋮⋮</span></td>
+      <td><div>${c.name}</div><input type="text" id="n${i}" class="itemnote" value="${esc(l.note||"")}" placeholder="Add text for the customer PDF" aria-label="Text shown under ${c.name} on the PDF"></td>
+      <td class="num"><input type="number" min="1" id="q${i}" value="${l.qty}" aria-label="Quantity for ${c.name}"></td>
+      <td class="num">${fmt(c.price)}</td>
+      <td class="num"><input type="number" min="-100" max="100" step="0.1" id="d${i}" value="${r2(l.disc)}" aria-label="Discount for ${c.name}, negative for a surcharge" class="${l.disc>MAX?'invalid':''}"></td>
+      <td class="num"><input type="number" step="1" id="t${i}" value="${Math.round(net(l))}" aria-label="Line total for ${c.name}" class="total${l.manual?' manual':''}" title="${l.manual?'Total edited by hand':'Type a total to set the price directly'}"></td>
+      <td><button class="icon" aria-label="Remove ${c.name}" data-rm="${i}">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+  const s=totals(lines);
+  $("#errors").innerHTML=s.errs.map(e=>`<div class="msg bad">${e}</div>`).join("");
+  const needs=maxDisc(lines)>AUTO && !approved && !s.errs.length;
+  $("#approveBtn").hidden=!(needs && joined);
+  $("#inviteBtn").hidden=joined; $("#inviteBtn").disabled=invited;
+  $("#presence").innerHTML=joined?'<span class="pill ok">● Sales director is in this quote</span>':(invited?'Invitation sent. Waiting for the sales director…':'');
+  $("#saveBtn").disabled=s.k!=="ok";
+  $("#saveBtn").textContent=$("#customTerms").checked?"Save and send to legal":"Save quote";
+  $("#pdfBtn").hidden=!(savedSnap && savedSnap===snap());
+  renderLog();
+}
+/* Customer PDF: shows a discount only when it is positive and was entered as a percentage.
+   Surcharges and hand-edited totals show as the net amount only. */
+function renderPdf(ls,tot){
+  const shown=l=>l.disc>0 && !l.manual;
+  const anyDisc=ls.some(shown);
+  const rows=ls.map(l=>`<tr><td>${item(l.id).name}${(l.note||"").trim()?`<div class="itemtext">${esc(l.note.trim())}</div>`:""}</td><td class="num">${l.qty}</td>${anyDisc?`<td class="num">${shown(l)?"−"+r2(l.disc)+"%":""}</td>`:""}<td class="num">${fmt(net(l))}</td></tr>`).join("");
+  const note=$("#pdfText").value.trim();
+  $("#pdf").innerHTML=`<div class="hdr"><span>OFFER Q-2041</span><span>Example Customer GmbH</span></div>
+    <table><thead><tr><th>Item</th><th class="num">Qty</th>${anyDisc?'<th class="num">Discount</th>':''}<th class="num">Net €</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="hdr"><span>Total (net)</span><span>€ ${fmt(tot)}</span></div>
+    ${note?`<div class="note">${note.replace(/</g,"&lt;")}</div>`:""}`;
+}
+function renderLog(){
+  $("#log").innerHTML=log.slice().reverse().map(e=>`<li><time>${e.t}</time><span><b>${e.who}</b>: ${e.what}</span></li>`).join("");
+}
+function addLog(who,what){log.push({t:now(),who,what})}
+
+$("#addSel").innerHTML=CATALOG.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
+$("#addBtn").onclick=()=>{const id=$("#addSel").value; lines.push({id,qty:1,disc:0,manual:false,note:""}); addLog("Sales manager",`Added ${item(id).name}`); render();};
+
+/* Commit on change (leaving the field / Enter) */
+$("#lines").addEventListener("change",e=>{
+  const m=e.target.id.match(/^([qdtn])(\d+)$/); if(!m) return;
+  const l=lines[+m[2]], n=item(l.id).name, pq=l.qty, pd=l.disc, pt=net(l);
+  apply(l,m[1],e.target.value);
+  if(m[1]==="n") addLog("Sales manager",`${n}: item text edited (carried to PDF)`);
+  else if(m[1]==="q") addLog("Sales manager",`${n}: quantity ${pq} → ${l.qty}`);
+  else if(m[1]==="d") addLog("Sales manager",`${n}: discount ${r2(pd)}% → ${r2(l.disc)}%${l.disc<0?" (surcharge)":""}`);
+  else addLog("Sales manager",`${n}: line total set by hand €${fmt(pt)} → €${fmt(net(l))}`);
+  if(l.disc>AUTO) approved=false;
+  render();
+});
+/* Live preview while typing, nothing saved */
+$("#lines").addEventListener("input",e=>{
+  const m=e.target.id.match(/^([qdtn])(\d+)$/); if(!m) return;
+  const i=+m[2], copy={...lines[i]}; apply(copy,m[1],e.target.value);
+  const tmp=lines.map((x,j)=>j===i?copy:x);
+  const row=e.target.closest("tr");
+  if(m[1]==="q"||m[1]==="t") row.querySelector(`#d${i}`).value=r2(copy.disc);
+  if(m[1]==="q"||m[1]==="d") row.querySelector(`#t${i}`).value=Math.round(net(copy));
+  totals(tmp);
+});
+$("#lines").addEventListener("click",e=>{const i=e.target.dataset.rm; if(i===undefined) return;
+  addLog("Sales manager",`Removed ${item(lines[i].id).name}`); lines.splice(+i,1); render();});
+$("#lines").addEventListener("dragstart",e=>{const tr=e.target.closest("tr"); if(!tr) return; dragIdx=+tr.dataset.i; tr.classList.add("dragging");});
+$("#lines").addEventListener("dragover",e=>{e.preventDefault(); document.querySelectorAll("tr.over").forEach(x=>x.classList.remove("over")); const tr=e.target.closest("tr"); if(tr) tr.classList.add("over");});
+$("#lines").addEventListener("drop",e=>{e.preventDefault(); const tr=e.target.closest("tr"); if(!tr||dragIdx===null) return;
+  const to=+tr.dataset.i; const [m]=lines.splice(dragIdx,1); lines.splice(to,0,m); addLog("Sales manager",`Moved ${item(m.id).name}`); dragIdx=null; render();});
+$("#lines").addEventListener("dragend",()=>{dragIdx=null; document.querySelectorAll("tr.dragging,tr.over").forEach(x=>x.classList.remove("dragging","over"));});
+$("#pdfText").addEventListener("input",()=>render());
+$("#pdfText").addEventListener("change",()=>{addLog("Sales manager","Edited PDF text (saved on quote)"); renderLog();});
+$("#customTerms").addEventListener("change",render);
+$("#inviteBtn").onclick=()=>{invited=true; addLog("Sales manager","Invited sales director to review the quote"); render();
+  setTimeout(()=>{joined=true; addLog("System","Sales director opened the quote from the notification"); render();},1600);};
+$("#approveBtn").onclick=()=>{approved=true; addLog("Sales director",`Approved discount of ${r2(maxDisc(lines))}% in session`); render();};
+$("#saveBtn").onclick=()=>{
+  const legal=$("#customTerms").checked;
+  addLog("Sales manager", legal?"Saved quote; legal notified for review":"Saved quote; ready to send");
+  savedSnap=snap(); render(); toast(legal?"Saved. Legal has been notified.":"Saved. Quote is ready to send.");
+};
+$("#pdfBtn").onclick=()=>{addLog("System","Customer PDF generated from the saved quote"); renderLog(); toast("PDF generated from the saved quote. (In the real platform this downloads the PDF.)");};
+$("#resetBtn").onclick=init;
+function toast(t){const d=document.createElement("div"); d.className="toast"; d.setAttribute("role","status"); d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600);}
+init();
+</script>
+
+</body>
+</html>
